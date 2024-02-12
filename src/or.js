@@ -5,14 +5,14 @@ import { isFunc } from "./util";
 /* Combine multiple function predicate specs into a single predicate
  * that will return `true` as soon as one of the predicates is valid.
  * Otherwise, return the last invalid result. */
-export default function or(...specs) {
+export function or(...specs) {
   if (!specs.every(isFunc)) {
     throw new TypeError(
       "'or' can only be used with function predicate specs. For more complex validation, use a 'flex' spec instead."
     );
   }
 
-  return createOrPred(...specs);
+  return createOrPred(specs);
 }
 
 function createOrPred(preds = []) {

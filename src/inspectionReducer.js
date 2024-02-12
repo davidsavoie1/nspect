@@ -16,6 +16,8 @@ import { unflex } from "./flex";
 import { isOpt } from "./opt";
 import { failSafeCheck, getPred } from "./pred";
 import { getSpread } from "./spread";
+import { flatMapErrors } from "./results";
+import { getMessage } from "./messages";
 
 const DEPS_SEPARATOR = "|";
 
@@ -23,6 +25,7 @@ export async function inspectionReducer(
   prevAcc = {},
   nextValue,
   {
+    active,
     ensure,
     key,
     path = [],
@@ -38,14 +41,25 @@ export async function inspectionReducer(
   const _spec = unflex(spec, nextValue, getFrom);
   const _required = expandRequired(required, nextValue, getFrom);
 
-  const { deps: prevDeps, res: prevRes, value: prevValue } = prevAcc;
-
-  const invalidated = anyDepChanged({
+  const {
+    active: prevActive,
     deps: prevDeps,
-    path,
-    prevRootValue,
-    rootValue,
-  });
+    res: prevRes,
+    value: prevValue,
+  } = prevAcc;
+
+  const prevIsActive = !!prevActive && !isColl(prevActive);
+  const isActive = !!active && !isColl(active);
+  const activated = !prevIsActive && isActive;
+
+  const invalidated =
+    activated ||
+    anyDepChanged({
+      deps: prevDeps,
+      path,
+      prevRootValue,
+      rootValue,
+    });
 
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
@@ -95,17 +109,51 @@ export async function inspectionReducer(
     const metaRes = checkMeta(nextValue);
 
     /* If value did not change and has not been invalidated,
-     * indicate that no change has occurred.
-     * If meta result is invalid, return as new result.
-     * Otherwise, reuse previous result and accumulator value. */
+     * indicate that no change has occurred. */
     if (!invalidated && equal(prevValue, nextValue)) {
-      if (metaRes !== true) return { changed: false, ...prevAcc, res: metaRes };
-      return { changed: false, ...prevAcc };
+      /* If inactive, return undefined result. */
+      if (!isActive)
+        return {
+          active: isActive,
+          changed: false,
+          ...prevAcc,
+          res: undefined,
+        };
+
+      /* If meta result is invalid, return as new result. */
+      if (metaRes !== true)
+        return {
+          active: isActive,
+          changed: false,
+          ...prevAcc,
+          res: metaRes,
+        };
+
+      /* Otherwise, reuse previous result and accumulator value. */
+      return {
+        active: isActive,
+        changed: false,
+        ...prevAcc,
+      };
     }
 
-    /* If value did change, return invalid meta result or validate next value. */
-    const nextRes = metaRes !== true ? metaRes : await validateOwn(nextValue);
-    return { changed: true, deps: ownDeps, res: nextRes, value: nextValue };
+    /* If value did change, return undefined when inactive,
+     * invalid meta result if invalid
+     * or validate next value. */
+    const nextRes = !isActive
+      ? undefined
+      : metaRes !== true
+      ? metaRes
+      : await validateOwn(nextValue);
+
+    /* Flag as changed */
+    return {
+      active: isActive,
+      changed: true,
+      deps: ownDeps,
+      res: nextRes,
+      value: nextValue,
+    };
   }
 
   const nextType = typeOf(nextValue);
@@ -125,6 +173,7 @@ export async function inspectionReducer(
         typeOf(prevValue) !== nextType
           ? {}
           : {
+              active: prevActive && get(k, prevActive),
               deps: get(k, prevDeps),
               res: get(k, prevRes),
               value: get(k, prevValue),
@@ -136,6 +185,7 @@ export async function inspectionReducer(
         res: subRes,
         value: subValue,
       } = await inspectionReducer(subAcc, subVal, {
+        active: isActive || get(k, active) || getSpread(active),
         ensure: get(k, _ensure) || getSpread(_ensure),
         key: k,
         path: [...path, k],
@@ -177,9 +227,9 @@ export async function inspectionReducer(
   if (ownDeps) deps[DEPS] = ownDeps;
 
   const errors = flatMapErrors(entries(res), ownRes, value);
-  res[ERRORS] = errors;
+  if (errors.length > 0) res[ERRORS] = errors;
 
-  return { changed, deps, res, value };
+  return { active, changed, deps, res, value };
 }
 
 function anyDepChanged({ deps, path, prevRootValue, rootValue }) {
@@ -228,71 +278,6 @@ async function validatePred(value, { getFrom, pred, ...options }) {
   return res === true ? undefined : res;
 }
 
-/* Aggregate a list of errors saved on `ERRORS` key,
- * prepending the new key to the previous path. */
-function flatMapErrors(listOfEntries, ownResult, ownValue) {
-  const updatedErrors = listOfEntries.flatMap(([key, res]) => {
-    const prevErrors = ((res && res[ERRORS]) || []).map(({ path, ...rest }) =>
-      enhanceError({
-        path: [key, ...path],
-        ...rest,
-      })
-    );
-
-    /* Omit error if result is undefined */
-    if (res === undefined) return prevErrors;
-
-    const value = get(key, ownValue);
-
-    /* If `res` is a collection, the error should have been caught in previous errors. */
-    if (isColl(res)) return prevErrors;
-
-    /* Prepend entry error to previous ones */
-    return [
-      enhanceError({
-        path: [key],
-        key,
-        reason: res,
-        value,
-      }),
-      ...prevErrors,
-    ];
-  });
-
-  const ownError = isColl(ownResult) ? getOwn(ownResult) : ownResult;
-  if (ownError === undefined) return updatedErrors;
-
-  /* Prepend own error to updated entry ones. */
-  return [
-    enhanceError({
-      path: [],
-      key: undefined,
-      reason: ownResult,
-      value: ownValue,
-    }),
-    ...updatedErrors,
-  ];
-}
-
-function enhanceError(err) {
-  const { path, reason = "" } = err;
-  if (path === undefined || typeof reason !== "string") {
-    return { ...err, message: reason, pathname: "" };
-  }
-
-  const pathname = path
-    .map((k, index) =>
-      typeof k === "number" ? `[${k}]` : index === 0 ? k : `.${k}`
-    )
-    .join("");
-
-  return {
-    ...err,
-    message: [pathname, reason].filter((x) => x).join(" "),
-    pathname,
-  };
-}
-
 /* `requirable` can be a function that will return a `required` prop
  * when passed in the value and the `getFrom` function. */
 function expandRequired(requirable, value, getFrom) {
@@ -301,9 +286,9 @@ function expandRequired(requirable, value, getFrom) {
 }
 
 function hasValue(x) {
-  return !MISSING_VALUES.includes(x) || "is required";
+  return !MISSING_VALUES.includes(x) || getMessage("isRequired");
 }
 
 function isPresent(x) {
-  return x !== undefined || "is missing";
+  return x !== undefined || getMessage("isMissing");
 }

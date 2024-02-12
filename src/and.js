@@ -19,7 +19,7 @@ export function and(...specs) {
 
   const { collSpecs, predSpecs } = triageSpecs(specs);
 
-  const pred = createAndPred(...predSpecs);
+  const pred = createAndPred(predSpecs);
 
   if (collSpecs.length < 1) return pred;
 
@@ -28,8 +28,8 @@ export function and(...specs) {
 
   const collWithPred = setPred(pred, collSpec);
 
-  /* If all collection specs are optional, flag the comined one as optional too. */
-  const allOptional = collSpec.every(isOpt);
+  /* If all collection specs are optional, flag the combined one as optional too. */
+  const allOptional = collSpecs.every(isOpt);
 
   return allOptional ? opt(collWithPred) : collWithPred;
 }

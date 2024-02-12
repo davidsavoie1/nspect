@@ -1,3 +1,5 @@
-import * as nsp from "nspect";
+import "./main.css";
 
-console.log(nsp);
+import App from "./src/App.svelte";
+
+new App({ target: document.getElementById("app") });
