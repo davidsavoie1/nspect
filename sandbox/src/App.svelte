@@ -11,30 +11,40 @@
     clsLabel,
   } from "./classes";
 
-  const not42 = (x, getFrom) => {
-    console.log("Check not42");
-    getFrom("../foo2");
-    return x !== 42 || "ne peut être la réponse de l'univers";
+  // const isTHEAnswer = (x, getFrom) => {
+  //   console.log("Check isTHEAnswer");
+  //   const ansToTheUniverse = getFrom("../ansToTheUniverse");
+  //   return x === ansToTheUniverse || "n'est pas la réponse à l'Univers";
+  // };
+
+  const sleep = (ms = 1000) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+  const isTHEAnswer = async (x) => {
+    console.log("Check isTHEAnswer");
+    await sleep();
+    const ansToTheUniverse = 42;
+    return x === ansToTheUniverse || "n'est pas la réponse à l'Univers";
   };
 </script>
 
 <script>
   const spec = s.and(
     {
-      ans: s.and(p.number, not42),
-      foo: s.and(
-        () => {
-          console.log("Check foo");
-          return true;
-        },
-        p.string,
-        p.stringBetween(3, 8)
-      ),
+      ans: s.and(p.number, isTHEAnswer),
+      // foo: s.and(
+      //   () => {
+      //     console.log("Check foo");
+      //     return true;
+      //   },
+      //   p.string,
+      //   p.stringBetween(3, 8)
+      // ),
     }
     // (obj) => Object.keys(obj).includes("bar") || "doit contenir 'bar'"
   );
 
-  let value = { ans: 42, foo: "" };
+  let value = { ans: 41, ansToTheUniverse: 42, foo: "" };
 
   let validation = {};
 
@@ -66,7 +76,7 @@
     <Nspector res={validation.ans} name="La réponse" />
   </label>
 
-  <label class="block space-y-1">
+  <!-- <label class="block space-y-1">
     <span class={clsLabel}>Foo</span>
     <input
       class={clsInputMaybeError(s.explain(validation.foo).invalid)}
@@ -75,6 +85,17 @@
       on:blur={() => inspector.activate("foo")}
     />
     <Nspector res={validation.foo} name="Foo" />
+  </label> -->
+
+  <label class="block space-y-1">
+    <span class={clsLabel}>LA Réponse</span>
+    <input
+      class={clsInputMaybeError(s.explain(validation.ansToTheUniverse).invalid)}
+      type="number"
+      bind:value={value.ansToTheUniverse}
+      on:blur={() => inspector.activate("ansToTheUniverse")}
+    />
+    <Nspector res={validation.ansToTheUniverse} name="LA Réponse" />
   </label>
 
   <Nspector res={validation} name="La valeur" />

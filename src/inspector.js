@@ -21,18 +21,15 @@ export function inspector({
     spec,
   };
 
-  let inspectionPromise;
-
-  async function inspectSerialized(...args) {
-    await inspectionPromise;
-    inspectionPromise = inspect(...args);
-    return inspectionPromise;
-  }
+  let promiseId;
 
   async function inspect(getPrevValue, getNextValue) {
     /* Ensure the last inspection promise has resolved before inspecting. */
     const prevValue = getPrevValue();
     const nextValue = getNextValue();
+
+    const now = Date.now();
+    promiseId = now;
 
     const reduced = await inspectionReducer(
       { ...state, value: prevValue },
@@ -44,6 +41,11 @@ export function inspector({
         active,
       }
     );
+
+    /* If the promiseId has changed, another validation
+     * has been requested, so the current result should
+     * be invalidated. */
+    if (promiseId !== now) return;
 
     state = reduced;
 
@@ -64,45 +66,41 @@ export function inspector({
     async activate(pathOrBool) {
       if (active !== true) {
         const path = normalizePath(pathOrBool);
-
         if (!path) active = !!pathOrBool;
 
         const activeColl = isColl(active) ? active : collFromKey(path[0]);
-
         active = setPath(path, true, activeColl);
       }
 
-      await inspectionPromise;
       const currValue = state.value;
 
-      return await inspectSerialized(
+      return await inspect(
         () => currValue,
         () => state.value
       );
     },
 
     async inspect(newValue) {
-      return await inspectSerialized(
+      return await inspect(
         () => state.value,
         () => newValue
       );
     },
 
     async reinspect() {
-      return await inspectSerialized(
+      return await inspect(
         () => undefined,
         () => state.value
       );
     },
 
     async reset() {
-      await inspectionPromise;
       const currValue = state.value;
 
       active = !latent;
       state = {};
 
-      return await inspectSerialized(
+      return await inspect(
         () => currValue,
         () => currValue
       );
@@ -110,7 +108,7 @@ export function inspector({
 
     async submit(newValue) {
       active = true;
-      const res = await inspectSerialized(
+      const res = await inspect(
         () => state.value,
         () => newValue
       );
