@@ -52,14 +52,14 @@ export async function inspectionReducer(
   const isActive = !!active && !isColl(active);
   const activated = !prevIsActive && isActive;
 
-  const invalidated =
-    activated ||
-    anyDepChanged({
-      deps: prevDeps,
-      path,
-      prevRootValue,
-      rootValue,
-    });
+  const depChanged = anyDepChanged({
+    deps: prevDeps,
+    path,
+    prevRootValue,
+    rootValue,
+  });
+
+  const invalidated = activated || depChanged;
 
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
@@ -106,56 +106,56 @@ export async function inspectionReducer(
 
   /* If not a collection, replace value entirely */
   if (!isColl(nextValue)) {
+    const hasChanged = !equal(prevValue, nextValue);
     const metaRes = checkMeta(nextValue);
 
-    /* If value did not change and has not been invalidated,
-     * indicate that no change has occurred. */
-    if (!invalidated && equal(prevValue, nextValue)) {
+    if (invalidated || hasChanged) {
+      /* If value did change, return undefined when inactive,
+       * invalid meta result if invalid
+       * or validate next value. */
+      const nextRes = !isActive
+        ? undefined
+        : metaRes !== true
+        ? metaRes
+        : await validateOwn(nextValue);
+
+      /* Flag as changed */
+      return {
+        active,
+        changed: hasChanged,
+        deps: ownDeps,
+        res: nextRes,
+        value: nextValue,
+      };
+    } else {
       /* If inactive, return undefined result. */
       if (!isActive)
         return {
-          active: isActive,
-          changed: false,
+          changed: hasChanged,
           ...prevAcc,
+          active,
           res: undefined,
         };
 
       /* If meta result is invalid, return as new result. */
       if (metaRes !== true)
         return {
-          active: isActive,
-          changed: false,
+          changed: hasChanged,
           ...prevAcc,
+          active,
           res: metaRes,
         };
 
       /* Otherwise, reuse previous result and accumulator value. */
       return {
-        active: isActive,
-        changed: false,
+        changed: hasChanged,
         ...prevAcc,
+        active,
       };
     }
-
-    /* If value did change, return undefined when inactive,
-     * invalid meta result if invalid
-     * or validate next value. */
-    const nextRes = !isActive
-      ? undefined
-      : metaRes !== true
-      ? metaRes
-      : await validateOwn(nextValue);
-
-    /* Flag as changed */
-    return {
-      active: isActive,
-      changed: true,
-      deps: ownDeps,
-      res: nextRes,
-      value: nextValue,
-    };
   }
 
+  /* If collection, reduce children in new reduced values */
   const nextType = typeOf(nextValue);
 
   const allKeys = [_spec, _required, _ensure, selection, nextValue]
@@ -173,7 +173,7 @@ export async function inspectionReducer(
         typeOf(prevValue) !== nextType
           ? {}
           : {
-              active: prevActive && get(k, prevActive),
+              active: isColl(prevActive) ? get(k, prevActive) : prevActive,
               deps: get(k, prevDeps),
               res: get(k, prevRes),
               value: get(k, prevValue),
@@ -185,7 +185,7 @@ export async function inspectionReducer(
         res: subRes,
         value: subValue,
       } = await inspectionReducer(subAcc, subVal, {
-        active: isActive || get(k, active) || getSpread(active),
+        active: isColl(active) ? get(k, active) : active,
         ensure: get(k, _ensure) || getSpread(_ensure),
         key: k,
         path: [...path, k],

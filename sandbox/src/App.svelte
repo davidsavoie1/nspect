@@ -4,6 +4,7 @@
 
   import Nspector from "./Nspector.svelte";
   import {
+    clsBtn,
     clsBtnError,
     clsBtnPrimary,
     clsInputMaybeError,
@@ -12,7 +13,7 @@
 
   const not42 = (x, getFrom) => {
     console.log("Check not42");
-    getFrom("../baz");
+    getFrom("../foo2");
     return x !== 42 || "ne peut être la réponse de l'univers";
   };
 </script>
@@ -21,17 +22,24 @@
   const spec = s.and(
     {
       ans: s.and(p.number, not42),
-      foo: s.and(p.string, p.stringBetween(3, 8)),
+      foo: s.and(
+        () => {
+          console.log("Check foo");
+          return true;
+        },
+        p.string,
+        p.stringBetween(3, 8)
+      ),
     }
     // (obj) => Object.keys(obj).includes("bar") || "doit contenir 'bar'"
   );
 
-  let value = { ans: 42, foo: null };
+  let value = { ans: 42, foo: "" };
 
   let validation = {};
 
   $: inspector = s.nspector({
-    active: false,
+    latent: true,
     ensure: { foo: 1 },
     spec,
     submit: (v) => console.log("Submitted", v),
@@ -77,5 +85,13 @@
     type="submit"
   >
     Soumettre
+  </button>
+
+  <button class={clsBtn} type="button" on:click={() => inspector.reinspect()}>
+    Réinspecter
+  </button>
+
+  <button class={clsBtn} type="button" on:click={() => inspector.reset()}>
+    Reset
   </button>
 </form>

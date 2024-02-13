@@ -3,7 +3,7 @@ import { explain } from "./results";
 import { collFromKey, isColl, normalizePath, setPath } from "./util";
 
 export function inspector({
-  active: initialActive = true,
+  latent = false, // Inactive at first, waiting for activation or first submit?
   ensure,
   required,
   selection,
@@ -11,7 +11,7 @@ export function inspector({
   submit, // (value) Function to call withh value after a successful inspection
   to, // (inpsectResult) Function to handle inspect result
 }) {
-  let active = initialActive,
+  let active = !latent,
     state = {};
 
   const baseArgs = {
@@ -26,6 +26,7 @@ export function inspector({
   async function inspectSerialized(...args) {
     await inspectionPromise;
     inspectionPromise = inspect(...args);
+    return inspectionPromise;
   }
 
   async function inspect(getPrevValue, getNextValue) {
@@ -33,12 +34,16 @@ export function inspector({
     const prevValue = getPrevValue();
     const nextValue = getNextValue();
 
-    const reduced = await inspectionReducer(state, nextValue, {
-      prevRootValue: prevValue,
-      rootValue: nextValue,
-      ...baseArgs,
-      active,
-    });
+    const reduced = await inspectionReducer(
+      { ...state, value: prevValue },
+      nextValue,
+      {
+        prevRootValue: prevValue,
+        rootValue: nextValue,
+        ...baseArgs,
+        active,
+      }
+    );
 
     state = reduced;
 
@@ -67,8 +72,9 @@ export function inspector({
         active = setPath(path, true, activeColl);
       }
 
-      const currValue = state.value;
       await inspectionPromise;
+      const currValue = state.value;
+
       return await inspectSerialized(
         () => currValue,
         () => state.value
@@ -86,6 +92,19 @@ export function inspector({
       return await inspectSerialized(
         () => undefined,
         () => state.value
+      );
+    },
+
+    async reset() {
+      await inspectionPromise;
+      const currValue = state.value;
+
+      active = !latent;
+      state = {};
+
+      return await inspectSerialized(
+        () => currValue,
+        () => currValue
       );
     },
 
