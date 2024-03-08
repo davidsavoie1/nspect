@@ -18,7 +18,7 @@ export function spread(spec, coll = []) {
 }
 
 export function getSpread(coll) {
-  return get("...", coll);
+  return get(SPREAD, coll) || get("...", coll);
 }
 
 export function setSpread(spec, coll) {

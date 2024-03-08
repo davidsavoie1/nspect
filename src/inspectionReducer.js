@@ -11,15 +11,21 @@ import {
   set,
   typeOf,
 } from "./util";
-import { DEPS, ERRORS, MISSING_VALUES, OWN } from "./constants";
+import { DEPS, DEPS_SEPARATOR, ERRORS, OWN } from "./constants";
 import { unflex } from "./flex";
 import { isOpt } from "./opt";
-import { failSafeCheck, getPred } from "./pred";
+import { getPred } from "./pred";
 import { getSpread } from "./spread";
 import { flatMapErrors } from "./results";
-import { getMessage } from "./messages";
-
-const DEPS_SEPARATOR = "|";
+import {
+  anyDepChanged,
+  combineSyncPreds,
+  createCollTypePred,
+  expandRequired,
+  hasValue,
+  isPresent,
+  validatePred,
+} from "./inspectionHelpers";
 
 export async function inspectionReducer(
   prevAcc = {},
@@ -32,7 +38,7 @@ export async function inspectionReducer(
     prevRootValue,
     required,
     rootValue,
-    selection,
+    selection = true,
     spec,
   } = {}
 ) {
@@ -63,6 +69,7 @@ export async function inspectionReducer(
 
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
+  const shouldValidate = isRequired || mustEnsure || !!selection;
 
   const firstColl = [_spec, _required, _ensure, selection].find(isColl);
   const collType = firstColl && typeOf(firstColl);
@@ -113,11 +120,12 @@ export async function inspectionReducer(
       /* If value did change, return undefined when inactive,
        * invalid meta result if invalid
        * or validate next value. */
-      const nextRes = !isActive
-        ? undefined
-        : metaRes !== true
-        ? metaRes
-        : await validateOwn(nextValue);
+      const nextRes =
+        !isActive || !shouldValidate
+          ? undefined
+          : metaRes !== true
+          ? metaRes
+          : await validateOwn(nextValue);
 
       /* Flag as changed */
       return {
@@ -169,6 +177,10 @@ export async function inspectionReducer(
 
       const subVal = get(k, nextValue);
 
+      const subSelection = isColl(selection)
+        ? get(k, selection) ?? getSpread(selection) ?? false
+        : selection;
+
       const subAcc =
         typeOf(prevValue) !== nextType
           ? {}
@@ -179,25 +191,24 @@ export async function inspectionReducer(
               value: get(k, prevValue),
             };
 
+      const subReduced = await inspectionReducer(subAcc, subVal, {
+        active: isColl(active) ? get(k, active) : active,
+        ensure: get(k, _ensure) ?? getSpread(_ensure),
+        key: k,
+        path: [...path, k],
+        prevRootValue,
+        required: get(k, _required) ?? getSpread(_required),
+        rootValue,
+        selection: subSelection,
+        spec: get(k, _spec) ?? getSpread(_spec),
+      });
+
       const {
         changed: subChanged,
         deps: subDeps,
         res: subRes,
         value: subValue,
-      } = await inspectionReducer(subAcc, subVal, {
-        active: isColl(active) ? get(k, active) : active,
-        ensure: get(k, _ensure) || getSpread(_ensure),
-        key: k,
-        path: [...path, k],
-        prevRootValue,
-        required: get(k, _required) || getSpread(_required),
-        rootValue,
-        selection:
-          selection === Infinity
-            ? selection
-            : get(k, selection) || getSpread(selection) || false,
-        spec: get(k, _spec) || getSpread(_spec),
-      });
+      } = subReduced;
 
       return {
         ...acc,
@@ -215,12 +226,13 @@ export async function inspectionReducer(
   );
 
   const metaRes = checkMeta(value);
-  const ownRes =
-    metaRes !== true
-      ? metaRes
-      : invalidated || changed
-      ? await validateOwn(value)
-      : getOwn(prevRes);
+  const ownRes = !shouldValidate
+    ? undefined
+    : metaRes !== true
+    ? metaRes
+    : invalidated || changed
+    ? await validateOwn(value)
+    : getOwn(prevRes);
 
   if (ownRes !== undefined) res[OWN] = ownRes;
 
@@ -230,65 +242,4 @@ export async function inspectionReducer(
   if (errors.length > 0) res[ERRORS] = errors;
 
   return { active, changed, deps, res, value };
-}
-
-function anyDepChanged({ deps, path, prevRootValue, rootValue }) {
-  const relPaths = depsToRelPaths(deps);
-  if (!relPaths) return false;
-  if (relPaths === true) return true;
-
-  return relPaths.some((relPath) => {
-    const prevVal = getFromValue(relPath, path, prevRootValue);
-    const nextVal = getFromValue(relPath, path, rootValue);
-    return !equal(prevVal, nextVal);
-  });
-}
-
-function depsToRelPaths(deps) {
-  if (!deps) return undefined;
-  if (deps === true) return true;
-  if (typeOf(deps) === "string") return deps.split(DEPS_SEPARATOR);
-  if (isColl(deps)) return depsToRelPaths(deps[DEPS]);
-  return undefined;
-}
-
-function combineSyncPreds(...preds) {
-  const fnPreds = preds.filter(isFunc);
-  if (fnPreds.length < 1) return () => true;
-  if (fnPreds.length === 1) return fnPreds[0];
-  return (...args) =>
-    fnPreds.reduce(
-      (res, fnPred) => (res !== true ? res : fnPred(...args)),
-      true
-    );
-}
-
-function createCollTypePred(collType) {
-  if (!collType) return undefined;
-  return function isCollType(x) {
-    return typeOf(x) === collType || `must be of type ${collType}`;
-  };
-}
-
-/* Validate a value against a predicate */
-async function validatePred(value, { getFrom, pred, ...options }) {
-  if (!pred) return undefined;
-  const res = await failSafeCheck(pred, value, getFrom, options);
-
-  return res === true ? undefined : res;
-}
-
-/* `requirable` can be a function that will return a `required` prop
- * when passed in the value and the `getFrom` function. */
-function expandRequired(requirable, value, getFrom) {
-  if (isFunc(requirable)) return expandRequired(requirable(value, getFrom));
-  return requirable;
-}
-
-function hasValue(x) {
-  return !MISSING_VALUES.includes(x) || getMessage("isRequired");
-}
-
-function isPresent(x) {
-  return x !== undefined || getMessage("isMissing");
 }

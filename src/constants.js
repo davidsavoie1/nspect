@@ -12,3 +12,4 @@ export const SPREAD = Symbol("SPREAD");
 export const VALID = { valid: true, promise: Promise.resolve({ valid: true }) };
 
 export const MISSING_VALUES = [undefined, null, ""];
+export const DEPS_SEPARATOR = "|";

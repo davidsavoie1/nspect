@@ -1,5 +1,14 @@
 import "./main.css";
+import { setMessages } from "nspect";
 
-import App from "./src/App.svelte";
+setMessages({
+  isInvalid: "est invalide",
+  isMissing: "est nécessaire",
+  isRequired: "est obligatoire",
+});
 
-new App({ target: document.getElementById("app") });
+import "./src/experiment";
+
+// import App from "./src/App.svelte";
+
+// new App({ target: document.getElementById("app") });

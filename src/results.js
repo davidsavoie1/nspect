@@ -70,14 +70,19 @@ export function explain(inspectResult) {
   const errors = getErrors(inspectResult);
   const ownErrors = errors.filter(({ key }) => key === undefined);
 
+  const invalid = errors.length > 0;
+  const ownInvalid = ownErrors.length > 0;
+
   return {
     error: errors[0],
     errors,
     ownError: ownErrors[0],
     ownErrors,
-    ownInvalid: ownErrors.length > 0,
-    invalid: errors.length > 0,
+    ownInvalid,
+    ownValid: !ownInvalid,
+    invalid,
     result: inspectResult,
+    valid: !invalid,
   };
 }
 

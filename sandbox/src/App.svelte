@@ -11,52 +11,48 @@
     clsLabel,
   } from "./classes";
 
-  // const isTHEAnswer = (x, getFrom) => {
-  //   console.log("Check isTHEAnswer");
-  //   const ansToTheUniverse = getFrom("../ansToTheUniverse");
-  //   return x === ansToTheUniverse || "n'est pas la réponse à l'Univers";
-  // };
+  const isAnswer = (x, getFrom) => {
+    const answer = getFrom("../answer");
+    return x === answer || `n'est pas la réponse (${answer})`;
+  };
 
   const sleep = (ms = 1000) =>
     new Promise((resolve) => setTimeout(resolve, ms));
 
   const isTHEAnswer = async (x) => {
-    console.log("Check isTHEAnswer");
-    await sleep();
+    // console.log("Check isTHEAnswer");
+    await sleep(0);
     const ansToTheUniverse = 42;
-    return x === ansToTheUniverse || "n'est pas la réponse à l'Univers";
+    return x === ansToTheUniverse || "n'est pas LA réponse à l'Univers";
   };
 </script>
 
 <script>
-  const spec = s.and(
-    {
-      ans: s.and(p.number, isTHEAnswer),
-      // foo: s.and(
-      //   () => {
-      //     console.log("Check foo");
-      //     return true;
-      //   },
-      //   p.string,
-      //   p.stringBetween(3, 8)
-      // ),
-    }
-    // (obj) => Object.keys(obj).includes("bar") || "doit contenir 'bar'"
-  );
+  const spec = s.spread(p.string);
 
-  let value = { ans: 41, ansToTheUniverse: 42, foo: "" };
+  let value = [1];
+  // let value = [42];
 
   let validation = {};
 
-  $: inspector = s.nspector({
-    latent: true,
-    ensure: { foo: 1 },
-    spec,
-    submit: (v) => console.log("Submitted", v),
-    to: (res) => (validation = res),
-  });
+  // $: inspector = s.nspector({
+  //   // latent: true,
+  //   // ensure: { foo: 1 },
+  //   spec,
+  //   submit: (v) => console.log("Submitted", v),
+  //   to: (res) => (validation = res),
+  // });
 
-  $: inspector.inspect(value);
+  $: s.inspect({
+    // ensure: { foo: 1 },
+    // required: { foo: 1 },
+    // selection,
+    spec,
+    stopEarly: false,
+    value,
+  }).then(console.log);
+
+  // $: inspector.inspect(value);
 
   $: ({ invalid } = s.explain(validation));
 </script>
@@ -68,12 +64,12 @@
   <label class="block space-y-1">
     <span class={clsLabel}>Réponse</span>
     <input
-      class={clsInputMaybeError(s.explain(validation.ans).invalid)}
+      class={clsInputMaybeError(s.explain(validation.myAnswer).invalid)}
       type="number"
-      bind:value={value.ans}
-      on:blur={() => inspector.activate("ans")}
+      bind:value={value.myAnswer}
+      on:blur={() => inspector.activate("myAnswer")}
     />
-    <Nspector res={validation.ans} name="La réponse" />
+    <Nspector res={validation.myAnswer} name="La réponse" />
   </label>
 
   <!-- <label class="block space-y-1">
@@ -87,7 +83,7 @@
     <Nspector res={validation.foo} name="Foo" />
   </label> -->
 
-  <label class="block space-y-1">
+  <!-- <label class="block space-y-1">
     <span class={clsLabel}>LA Réponse</span>
     <input
       class={clsInputMaybeError(s.explain(validation.ansToTheUniverse).invalid)}
@@ -96,7 +92,7 @@
       on:blur={() => inspector.activate("ansToTheUniverse")}
     />
     <Nspector res={validation.ansToTheUniverse} name="LA Réponse" />
-  </label>
+  </label> -->
 
   <Nspector res={validation} name="La valeur" />
 
