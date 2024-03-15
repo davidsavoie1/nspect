@@ -63,7 +63,8 @@ async function _inspect({
 
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
-  const shouldValidate = isRequired || mustEnsure || !!selection;
+  const shouldValidate =
+    isRequired || mustEnsure || (!!selection && value !== undefined);
 
   const firstColl = [_spec, _required, _ensure, selection].find(isColl);
   const collType = firstColl && typeOf(firstColl);
