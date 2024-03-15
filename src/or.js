@@ -20,7 +20,7 @@ function createOrPred(preds = []) {
   if (fnPreds.length < 1) return undefined;
 
   async function anyPass(value, getFrom, options) {
-    let lastInvalidRes;
+    let firstInvalidRes;
 
     /* Execute preds one at a time in a short-circuit manner.
      * As soon as one is valid, stop execution. */
@@ -29,10 +29,10 @@ function createOrPred(preds = []) {
 
       /* If result is valid, stop execution and return true. */
       if (res === true) return true;
-      lastInvalidRes = res;
+      if (!firstInvalidRes) firstInvalidRes = res;
     }
 
-    return lastInvalidRes;
+    return firstInvalidRes;
   }
 
   /* Attach predicates on the function itself, for reference. */
