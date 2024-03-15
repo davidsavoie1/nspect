@@ -16,7 +16,14 @@ const isTHEAnswer = async (x) => {
 };
 
 const spec = {
-  foo: isTHEAnswer,
+  a: p.number,
+  foo: s.flex((x) =>
+    typeof x === "number"
+      ? isTHEAnswer
+      : typeof x === "string"
+        ? (str) => str.length === 42 || "n'est pas LA réponse textuelle"
+        : () => "n'a même pas le bon type!"
+  ),
   foo2: s.and(
     s.spread(p.string, [p.number, isTHEAnswer]),
     (obj) =>
@@ -24,7 +31,11 @@ const spec = {
   ),
 };
 
-let value = { foo: null, foo2: ["1", 42, 32] };
+let value = {
+  a: 2,
+  foo: "Une réponse valide pour le moment, d'accord?",
+  foo2: ["1", 42, 32],
+};
 // let value = [42];
 
 // $: inspector = s.nspector({
@@ -35,11 +46,22 @@ let value = { foo: null, foo2: ["1", 42, 32] };
 //   to: (res) => (validation = res),
 // });
 
-s.inspect({
+// s.inspect({
+//   // ensure: { foo: 1 },
+//   // required: { foo: 1 },
+//   selection: { foo: 1, foo2: false },
+//   spec,
+//   stopEarly: false,
+//   value,
+// }).then(({ errors }) => console.log(errors));
+
+s.check({
   // ensure: { foo: 1 },
   // required: { foo: 1 },
-  selection: { foo: 1, foo2: s.spread(true) },
+  selection: { a: 1 },
   spec,
   stopEarly: false,
   value,
-}).then(({ errors }) => console.log(errors));
+})
+  .then(console.log)
+  .catch((res) => console.warn("An error occurred:", res));

@@ -1,7 +1,10 @@
 export { and } from "./and";
+export { check } from "./check";
+export { conform } from "./conform";
 export { flex, isFlex, unflex } from "./flex";
 export { inspect } from "./inspect";
 export { inspector as nspector } from "./inspector";
+export { isValid } from "./isValid";
 export { getMessage, getMessages, setMessages } from "./messages";
 export { isOpt, opt } from "./opt";
 export { or } from "./or";
