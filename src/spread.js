@@ -22,6 +22,8 @@ export function getSpread(coll) {
 }
 
 export function setSpread(spec, coll) {
+  if (!spec) return coll;
+
   coll[SPREAD] = spec;
   return coll;
 }
