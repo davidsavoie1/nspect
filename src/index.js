@@ -10,5 +10,6 @@ export { isOpt, nilable, opt } from "./opt";
 export { or } from "./or";
 export { getPred } from "./pred";
 export { explain } from "./results";
+export { select } from "./select";
 export { spread } from "./spread";
 export { getSpread } from "./spreadHelpers";
