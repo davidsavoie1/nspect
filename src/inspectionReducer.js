@@ -69,7 +69,8 @@ export async function inspectionReducer(
 
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
-  const shouldValidate = isRequired || mustEnsure || !!selection;
+  const shouldValidate =
+    isRequired || mustEnsure || (!!selection && nextValue !== undefined);
 
   const firstColl = [_spec, _required, _ensure, selection].find(isColl);
   const collType = firstColl && typeOf(firstColl);
@@ -136,8 +137,8 @@ export async function inspectionReducer(
         value: nextValue,
       };
     } else {
-      /* If inactive, return undefined result. */
-      if (!isActive)
+      /* If inactive or not to be validated, return undefined result. */
+      if (!isActive || !shouldValidate)
         return {
           changed: hasChanged,
           ...prevAcc,
