@@ -1,7 +1,7 @@
 {
   "name": "nspect",
-  "version": "3.2.0",
-  "description": "Simple, reusable and composable validation",
+  "version": "0.0.1",
+  "description": "Composable validation with same shape value and schema",
   "homepage": "https://davidsavoie1.github.io/nspect",
   "repository": {
     "type": "git",
@@ -22,14 +22,17 @@
   ],
   "author": "David Savoie",
   "license": "ISC",
+  "type": "module",
   "source": "src/index.js",
-  "main": "dist/nspect.umd.js",
-  "module": "dist/nspect.modern.js",
+  "exports": {
+    "require": "./dist/nspect.cjs",
+    "default": "./dist/nspect.modern.js"
+  },
+  "main": "./dist/nspect.cjs",
+  "module": "./dist/nspect.module.js",
   "scripts": {
-    "build": "microbundle src/index.js -f modern,umd --sourcemap false --no-compress",
-    "dev": "microbundle watch src/index.js -f modern,umd --sourcemap false --no-compress",
-    "docs": "docsify serve docs",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "microbundle",
+    "dev": "microbundle watch"
   },
   "files": [
     "dist"
