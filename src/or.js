@@ -5,14 +5,14 @@ import { isFunc } from "./util";
 /* Combine multiple function predicate specs into a single predicate
  * that will return `true` as soon as one of the predicates is valid.
  * Otherwise, return the last invalid result. */
-export default function or(...specs) {
+export function or(...specs) {
   if (!specs.every(isFunc)) {
     throw new TypeError(
       "'or' can only be used with function predicate specs. For more complex validation, use a 'flex' spec instead."
     );
   }
 
-  return createOrPred(...specs);
+  return createOrPred(specs);
 }
 
 function createOrPred(preds = []) {
@@ -20,7 +20,7 @@ function createOrPred(preds = []) {
   if (fnPreds.length < 1) return undefined;
 
   async function anyPass(value, getFrom, options) {
-    let lastInvalidRes;
+    let firstInvalidRes;
 
     /* Execute preds one at a time in a short-circuit manner.
      * As soon as one is valid, stop execution. */
@@ -29,10 +29,10 @@ function createOrPred(preds = []) {
 
       /* If result is valid, stop execution and return true. */
       if (res === true) return true;
-      lastInvalidRes = res;
+      if (!firstInvalidRes) firstInvalidRes = res;
     }
 
-    return lastInvalidRes;
+    return firstInvalidRes;
   }
 
   /* Attach predicates on the function itself, for reference. */

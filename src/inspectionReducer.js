@@ -11,25 +11,34 @@ import {
   set,
   typeOf,
 } from "./util";
-import { DEPS, ERRORS, MISSING_VALUES, OWN } from "./constants";
+import { DEPS, DEPS_SEPARATOR, ERRORS, OWN } from "./constants";
 import { unflex } from "./flex";
 import { isOpt } from "./opt";
-import { failSafeCheck, getPred } from "./pred";
-import { getSpread } from "./spread";
-
-const DEPS_SEPARATOR = "|";
+import { getPred } from "./pred";
+import { getSpread } from "./spreadHelpers";
+import { flatMapErrors } from "./results";
+import {
+  anyDepChanged,
+  combineSyncPreds,
+  createCollTypePred,
+  expandRequired,
+  hasValue,
+  isPresent,
+  validatePred,
+} from "./inspectionHelpers";
 
 export async function inspectionReducer(
   prevAcc = {},
   nextValue,
   {
+    active,
     ensure,
     key,
     path = [],
     prevRootValue,
     required,
     rootValue,
-    selection,
+    selection = true,
     spec,
   } = {}
 ) {
@@ -38,17 +47,30 @@ export async function inspectionReducer(
   const _spec = unflex(spec, nextValue, getFrom);
   const _required = expandRequired(required, nextValue, getFrom);
 
-  const { deps: prevDeps, res: prevRes, value: prevValue } = prevAcc;
+  const {
+    active: prevActive,
+    deps: prevDeps,
+    res: prevRes,
+    value: prevValue,
+  } = prevAcc;
 
-  const invalidated = anyDepChanged({
+  const prevIsActive = !!prevActive && !isColl(prevActive);
+  const isActive = !!active && !isColl(active);
+  const activated = !prevIsActive && isActive;
+
+  const depChanged = anyDepChanged({
     deps: prevDeps,
     path,
     prevRootValue,
     rootValue,
   });
 
+  const invalidated = activated || depChanged;
+
   const isRequired = _required && !isOpt(_required);
   const mustEnsure = _ensure && !isOpt(_ensure);
+  const shouldValidate =
+    isRequired || mustEnsure || (!!selection && nextValue !== undefined);
 
   const firstColl = [_spec, _required, _ensure, selection].find(isColl);
   const collType = firstColl && typeOf(firstColl);
@@ -92,22 +114,57 @@ export async function inspectionReducer(
 
   /* If not a collection, replace value entirely */
   if (!isColl(nextValue)) {
+    const hasChanged = !equal(prevValue, nextValue);
     const metaRes = checkMeta(nextValue);
 
-    /* If value did not change and has not been invalidated,
-     * indicate that no change has occurred.
-     * If meta result is invalid, return as new result.
-     * Otherwise, reuse previous result and accumulator value. */
-    if (!invalidated && equal(prevValue, nextValue)) {
-      if (metaRes !== true) return { changed: false, ...prevAcc, res: metaRes };
-      return { changed: false, ...prevAcc };
-    }
+    if (invalidated || hasChanged) {
+      /* If value did change, return undefined when inactive,
+       * invalid meta result if invalid
+       * or validate next value. */
+      const nextRes =
+        !isActive || !shouldValidate
+          ? undefined
+          : metaRes !== true
+          ? metaRes
+          : await validateOwn(nextValue);
 
-    /* If value did change, return invalid meta result or validate next value. */
-    const nextRes = metaRes !== true ? metaRes : await validateOwn(nextValue);
-    return { changed: true, deps: ownDeps, res: nextRes, value: nextValue };
+      /* Flag as changed */
+      return {
+        active,
+        changed: hasChanged,
+        deps: ownDeps,
+        res: nextRes,
+        value: nextValue,
+      };
+    } else {
+      /* If inactive or not to be validated, return undefined result. */
+      if (!isActive || !shouldValidate)
+        return {
+          changed: hasChanged,
+          ...prevAcc,
+          active,
+          res: undefined,
+        };
+
+      /* If meta result is invalid, return as new result. */
+      if (metaRes !== true)
+        return {
+          changed: hasChanged,
+          ...prevAcc,
+          active,
+          res: metaRes,
+        };
+
+      /* Otherwise, reuse previous result and accumulator value. */
+      return {
+        changed: hasChanged,
+        ...prevAcc,
+        active,
+      };
+    }
   }
 
+  /* If collection, reduce children in new reduced values */
   const nextType = typeOf(nextValue);
 
   const allKeys = [_spec, _required, _ensure, selection, nextValue]
@@ -121,33 +178,38 @@ export async function inspectionReducer(
 
       const subVal = get(k, nextValue);
 
+      const subSelection = isColl(selection)
+        ? get(k, selection) ?? getSpread(selection) ?? false
+        : selection;
+
       const subAcc =
         typeOf(prevValue) !== nextType
           ? {}
           : {
+              active: isColl(prevActive) ? get(k, prevActive) : prevActive,
               deps: get(k, prevDeps),
               res: get(k, prevRes),
               value: get(k, prevValue),
             };
+
+      const subReduced = await inspectionReducer(subAcc, subVal, {
+        active: isColl(active) ? get(k, active) : active,
+        ensure: get(k, _ensure) ?? getSpread(_ensure),
+        key: k,
+        path: [...path, k],
+        prevRootValue,
+        required: get(k, _required) ?? getSpread(_required),
+        rootValue,
+        selection: subSelection,
+        spec: get(k, _spec) ?? getSpread(_spec),
+      });
 
       const {
         changed: subChanged,
         deps: subDeps,
         res: subRes,
         value: subValue,
-      } = await inspectionReducer(subAcc, subVal, {
-        ensure: get(k, _ensure) || getSpread(_ensure),
-        key: k,
-        path: [...path, k],
-        prevRootValue,
-        required: get(k, _required) || getSpread(_required),
-        rootValue,
-        selection:
-          selection === Infinity
-            ? selection
-            : get(k, selection) || getSpread(selection) || false,
-        spec: get(k, _spec) || getSpread(_spec),
-      });
+      } = subReduced;
 
       return {
         ...acc,
@@ -165,145 +227,20 @@ export async function inspectionReducer(
   );
 
   const metaRes = checkMeta(value);
-  const ownRes =
-    metaRes !== true
-      ? metaRes
-      : invalidated || changed
-      ? await validateOwn(value)
-      : getOwn(prevRes);
+  const ownRes = !shouldValidate
+    ? undefined
+    : metaRes !== true
+    ? metaRes
+    : invalidated || changed
+    ? await validateOwn(value)
+    : getOwn(prevRes);
 
   if (ownRes !== undefined) res[OWN] = ownRes;
 
   if (ownDeps) deps[DEPS] = ownDeps;
 
   const errors = flatMapErrors(entries(res), ownRes, value);
-  res[ERRORS] = errors;
+  if (errors.length > 0) res[ERRORS] = errors;
 
-  return { changed, deps, res, value };
-}
-
-function anyDepChanged({ deps, path, prevRootValue, rootValue }) {
-  const relPaths = depsToRelPaths(deps);
-  if (!relPaths) return false;
-  if (relPaths === true) return true;
-
-  return relPaths.some((relPath) => {
-    const prevVal = getFromValue(relPath, path, prevRootValue);
-    const nextVal = getFromValue(relPath, path, rootValue);
-    return !equal(prevVal, nextVal);
-  });
-}
-
-function depsToRelPaths(deps) {
-  if (!deps) return undefined;
-  if (deps === true) return true;
-  if (typeOf(deps) === "string") return deps.split(DEPS_SEPARATOR);
-  if (isColl(deps)) return depsToRelPaths(deps[DEPS]);
-  return undefined;
-}
-
-function combineSyncPreds(...preds) {
-  const fnPreds = preds.filter(isFunc);
-  if (fnPreds.length < 1) return () => true;
-  if (fnPreds.length === 1) return fnPreds[0];
-  return (...args) =>
-    fnPreds.reduce(
-      (res, fnPred) => (res !== true ? res : fnPred(...args)),
-      true
-    );
-}
-
-function createCollTypePred(collType) {
-  if (!collType) return undefined;
-  return function isCollType(x) {
-    return typeOf(x) === collType || `must be of type ${collType}`;
-  };
-}
-
-/* Validate a value against a predicate */
-async function validatePred(value, { getFrom, pred, ...options }) {
-  if (!pred) return undefined;
-  const res = await failSafeCheck(pred, value, getFrom, options);
-
-  return res === true ? undefined : res;
-}
-
-/* Aggregate a list of errors saved on `ERRORS` key,
- * prepending the new key to the previous path. */
-function flatMapErrors(listOfEntries, ownResult, ownValue) {
-  const updatedErrors = listOfEntries.flatMap(([key, res]) => {
-    const prevErrors = ((res && res[ERRORS]) || []).map(({ path, ...rest }) =>
-      enhanceError({
-        path: [key, ...path],
-        ...rest,
-      })
-    );
-
-    /* Omit error if result is undefined */
-    if (res === undefined) return prevErrors;
-
-    const value = get(key, ownValue);
-
-    /* If `res` is a collection, the error should have been caught in previous errors. */
-    if (isColl(res)) return prevErrors;
-
-    /* Prepend entry error to previous ones */
-    return [
-      enhanceError({
-        path: [key],
-        key,
-        reason: res,
-        value,
-      }),
-      ...prevErrors,
-    ];
-  });
-
-  const ownError = isColl(ownResult) ? getOwn(ownResult) : ownResult;
-  if (ownError === undefined) return updatedErrors;
-
-  /* Prepend own error to updated entry ones. */
-  return [
-    enhanceError({
-      path: [],
-      key: undefined,
-      reason: ownResult,
-      value: ownValue,
-    }),
-    ...updatedErrors,
-  ];
-}
-
-function enhanceError(err) {
-  const { path, reason = "" } = err;
-  if (path === undefined || typeof reason !== "string") {
-    return { ...err, message: reason, pathname: "" };
-  }
-
-  const pathname = path
-    .map((k, index) =>
-      typeof k === "number" ? `[${k}]` : index === 0 ? k : `.${k}`
-    )
-    .join("");
-
-  return {
-    ...err,
-    message: [pathname, reason].filter((x) => x).join(" "),
-    pathname,
-  };
-}
-
-/* `requirable` can be a function that will return a `required` prop
- * when passed in the value and the `getFrom` function. */
-function expandRequired(requirable, value, getFrom) {
-  if (isFunc(requirable)) return expandRequired(requirable(value, getFrom));
-  return requirable;
-}
-
-function hasValue(x) {
-  return !MISSING_VALUES.includes(x) || "is required";
-}
-
-function isPresent(x) {
-  return x !== undefined || "is missing";
+  return { active, changed, deps, res, value };
 }

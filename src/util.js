@@ -18,15 +18,17 @@ export const isSpec = (x) => isFunc(x) || isColl(x);
  * a collection is given, return a function that will pass its arguments
  * to the proposer implementation based on the collection type.
  * A string type can be given instead of a collection. */
-export const polymorph = (implementations, posOfColl = 1) => (...args) => {
-  const collOrType = args[posOfColl - 1];
-  const type =
-    typeOf(collOrType) === "string" ? collOrType : typeOf(collOrType);
+export const polymorph =
+  (implementations, posOfColl = 1) =>
+  (...args) => {
+    const collOrType = args[posOfColl - 1];
+    const type =
+      typeOf(collOrType) === "string" ? collOrType : typeOf(collOrType);
 
-  const fn = implementations[type] || implementations["_"];
-  if (!fn) throw new TypeError(`Not implemented for type '${type}'`);
-  return fn(...args);
-};
+    const fn = implementations[type] || implementations["_"];
+    if (!fn) throw new TypeError(`Not implemented for type '${type}'`);
+    return fn(...args);
+  };
 
 export const entries = polymorph({
   array: (arr) => arr.map((v, i) => [i, v]),
@@ -64,6 +66,10 @@ export const newColl = polymorph(
   1
 );
 
+export const collFromKey = (key) => {
+  return typeof key === "string" ? {} : typeof key === "number" ? [] : null;
+};
+
 export const get = polymorph(
   {
     array: (index, arr) => arr[index],
@@ -88,6 +94,22 @@ export function getPath(path = [], value) {
   return path.reduce((parent, key) => get(key, parent), value);
 }
 
+/* Set a value at specified array path on collection
+ * by recursively setting the necessary children sub collections
+ * and updating exising ones. */
+export function setPath(path, x, coll) {
+  const [key, ...restPath] = path;
+
+  const child = get(key, coll) || collFromKey(key);
+
+  if (!isColl(child)) return coll;
+
+  if (restPath.length <= 0) return set(key, x, coll);
+
+  const updatedChild = setPath(restPath, x, child);
+  return set(key, updatedChild, coll);
+}
+
 export const keys = polymorph({
   array: (arr) => arr.map((v, i) => i),
   map: (map) => Array.from(map.keys()),
@@ -110,6 +132,16 @@ export function asKey(key) {
   if (!isColl(key)) return key;
   return JSON.stringify(key);
 }
+
+export const normalizePath = (x) => {
+  return Array.isArray(x)
+    ? x
+    : typeof x === "string"
+    ? x.split(".")
+    : typeof x === "number"
+    ? [x]
+    : null;
+};
 
 /* Given a value and a current path, return the sub value
  * at a path relative to current one. */

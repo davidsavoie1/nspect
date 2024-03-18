@@ -2,6 +2,7 @@ import { AND } from "./constants";
 import { flex, isFlex, unflex } from "./flex";
 import { isOpt, opt } from "./opt";
 import { failSafeCheck, getPred, setPred } from "./pred";
+import { getSpread, setSpread } from "./spreadHelpers";
 import { entries, get, isColl, isFunc, set, typeOf } from "./util";
 
 /* Combine multiple specs together, merging all the predicate functions
@@ -19,7 +20,7 @@ export function and(...specs) {
 
   const { collSpecs, predSpecs } = triageSpecs(specs);
 
-  const pred = createAndPred(...predSpecs);
+  const pred = createAndPred(predSpecs);
 
   if (collSpecs.length < 1) return pred;
 
@@ -28,8 +29,8 @@ export function and(...specs) {
 
   const collWithPred = setPred(pred, collSpec);
 
-  /* If all collection specs are optional, flag the comined one as optional too. */
-  const allOptional = collSpec.every(isOpt);
+  /* If all collection specs are optional, flag the combined one as optional too. */
+  const allOptional = collSpecs.every(isOpt);
 
   return allOptional ? opt(collWithPred) : collWithPred;
 }
@@ -65,7 +66,9 @@ function combineCollSpecs(coll1, coll2) {
     throw new TypeError("Collection specs to combine must be of the same type");
   }
 
-  return entries(coll2).reduce((prev, [key, spec]) => {
+  const combinedSpread = and(getSpread(coll1), getSpread(coll2));
+
+  const combinedCollSpec = entries(coll2).reduce((prev, [key, spec]) => {
     const prevSpec = get(key, coll1);
     if (!prevSpec) return set(key, spec, prev);
 
@@ -73,11 +76,16 @@ function combineCollSpecs(coll1, coll2) {
      * combine them with `and`. */
     return set(key, and(prevSpec, spec), prev);
   }, coll1);
+
+  return setSpread(combinedSpread, combinedCollSpec);
 }
 
 function createAndPred(preds = []) {
   const fnPreds = preds.filter(isFunc);
   if (fnPreds.length < 1) return undefined;
+
+  /* If only a single function pred, return it. */
+  if (fnPreds.length === 1) return fnPreds[0];
 
   async function allPass(value, getFrom, options) {
     const results = await Promise.all(

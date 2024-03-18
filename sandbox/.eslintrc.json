@@ -1,0 +1,22 @@
+{
+  "env": { "es6": true, "browser": true },
+  "plugins": ["svelte"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:svelte/recommended",
+    "plugin:svelte/prettier",
+    "prettier"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+
+  "rules": {
+    "no-console": "warn",
+    "no-unused-labels": "off",
+    "no-unused-vars": ["error", { "ignoreRestSiblings": true }]
+  },
+
+  "root": true
+}

@@ -1,3 +1,14 @@
-import * as nsp from "nspect";
+import "./main.css";
+import { setMessages } from "nspect";
 
-console.log(nsp);
+setMessages({
+  isInvalid: "est invalide",
+  isMissing: "est nécessaire",
+  isRequired: "est obligatoire",
+});
+
+// import "./src/experiment";
+
+import App from "./src/App.svelte";
+
+new App({ target: document.getElementById("app") });
