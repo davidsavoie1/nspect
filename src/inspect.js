@@ -13,7 +13,7 @@ import { ERRORS, OWN } from "./constants";
 import { unflex } from "./flex";
 import { isOpt } from "./opt";
 import { getPred } from "./pred";
-import { getSpread } from "./spread";
+import { getSpread } from "./spreadHelpers";
 import { explain, flatMapErrors } from "./results";
 import {
   combineSyncPreds,

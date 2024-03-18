@@ -2,7 +2,7 @@ import { AND } from "./constants";
 import { flex, isFlex, unflex } from "./flex";
 import { isOpt, opt } from "./opt";
 import { failSafeCheck, getPred, setPred } from "./pred";
-import { getSpread, setSpread } from "./spread";
+import { getSpread, setSpread } from "./spreadHelpers";
 import { entries, get, isColl, isFunc, set, typeOf } from "./util";
 
 /* Combine multiple specs together, merging all the predicate functions
