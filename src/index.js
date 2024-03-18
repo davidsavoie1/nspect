@@ -5,6 +5,7 @@ export { flex, isFlex, unflex } from "./flex";
 export { inspect } from "./inspect";
 export { inspector as nspector } from "./inspector";
 export { isValid } from "./isValid";
+export { key } from "./key";
 export { getMessage, getMessages, setMessages } from "./messages";
 export { isOpt, nilable, opt } from "./opt";
 export { or } from "./or";

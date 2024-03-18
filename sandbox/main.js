@@ -7,8 +7,8 @@ setMessages({
   isRequired: "est obligatoire",
 });
 
-// import "./src/experiment";
+import "./src/experiment";
 
-import App from "./src/App.svelte";
+// import App from "./src/App.svelte";
 
-new App({ target: document.getElementById("app") });
+// new App({ target: document.getElementById("app") });
