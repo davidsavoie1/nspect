@@ -1,3 +1,5 @@
+import { validatePredSpecma } from "./inspectionHelpers";
+
 export { and } from "./and";
 export { check } from "./check";
 export { conform } from "./conform";
@@ -14,3 +16,7 @@ export { explain } from "./results";
 export { select } from "./select";
 export { spread } from "./spread";
 export { getSpread } from "./spreadHelpers";
+
+/* For retrocompatibility with Svelte-Specma `configure(specmaFns)`.
+ * Particularly useful for progressive migration to Nspect. */
+export { validatePredSpecma as validatePred };

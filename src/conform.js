@@ -18,7 +18,12 @@ export async function conform({
     value,
   });
 
-  if (res.valid) return value;
+  interpretConform(res);
+}
 
-  throw res;
+function interpretConform(result) {
+  if (result.valid === true) return result.value;
+  const error = new Error(result.error.message);
+  error.details = result.error;
+  throw error;
 }

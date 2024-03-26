@@ -99,8 +99,6 @@ async function _inspect({
     ? metaRes
     : await validateOwn(value);
 
-  // console.log(key, spec, value, ownRes);
-
   /* If not a collection, return own result only. */
   if (!isColl(value)) return ownRes;
 

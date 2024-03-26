@@ -1,6 +1,6 @@
 import equal from "fast-deep-equal/es6";
-import { getFromValue, isColl, isFunc, typeOf } from "./util";
-import { DEPS, DEPS_SEPARATOR, MISSING_VALUES } from "./constants";
+import { getFromValue, isColl, isFunc, isPromise, typeOf } from "./util";
+import { DEPS, DEPS_SEPARATOR, MISSING_VALUES, VALID } from "./constants";
 import { failSafeCheck } from "./pred";
 import { getMessage } from "./messages";
 
@@ -48,6 +48,27 @@ export async function validatePred(value, { getFrom, pred, ...options }) {
   const res = await failSafeCheck(pred, value, getFrom, options);
 
   return res === true ? undefined : res;
+}
+
+export function validatePredSpecma(pred, value, getFrom, options) {
+  if (!pred) return interpretPredAnswer(true);
+  const ans = failSafeCheck(pred, value, getFrom, options);
+  return interpretPredAnswer(ans);
+}
+
+function interpretPredAnswer(ans) {
+  if (ans === true) return VALID;
+
+  if (isPromise(ans)) {
+    return {
+      valid: null,
+      promise: ans.then((promisedAns) => {
+        return interpretPredAnswer(promisedAns);
+      }),
+    };
+  }
+
+  return { valid: false, reason: ans || getMessage("isInvalid") };
 }
 
 /* `requirable` can be a function that will return a `required` prop
