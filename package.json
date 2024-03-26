@@ -1,6 +1,6 @@
 {
   "name": "nspect",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Composable validation with same shape value and schema",
   "homepage": "https://davidsavoie1.github.io/nspect",
   "repository": {
