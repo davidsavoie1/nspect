@@ -107,8 +107,10 @@ export async function inspectionReducer(
   }
 
   /* Prepare a predicate function to validate own predicate. */
-  const validateOwn = (x) =>
-    validatePred(x, { getFrom, key, path, pred: ownPred });
+  const validateOwn = (x) => {
+    if (!isActive) return undefined;
+    return validatePred(x, { getFrom, key, path, pred: ownPred });
+  };
 
   /* EXECUTION */
 

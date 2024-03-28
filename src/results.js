@@ -68,15 +68,18 @@ export function enhanceError(err) {
 
 export function explain(inspectResult) {
   const errors = getErrors(inspectResult);
+  const error = errors[0];
+
   const ownErrors = errors.filter(({ key }) => key === undefined);
+  const ownError = ownErrors[0];
 
   const invalid = errors.length > 0;
   const ownInvalid = ownErrors.length > 0;
 
   return {
-    error: errors[0],
+    error,
     errors,
-    ownError: ownErrors[0],
+    ownError,
     ownErrors,
     ownInvalid,
     ownValid: !ownInvalid,
