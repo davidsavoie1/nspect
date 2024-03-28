@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.4] - 2024-03-28
+
+### Grow
+
+- Attach `explain` and `changed` to `inspector`;
+
+### Fix
+
+- Validate collection's own predicate only when active;
+- Limit fields in inspector to thos specified in `selection`;
+
+---
+
 ## [0.0.3] - 2024-03-26
 
 ### Grow
