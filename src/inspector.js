@@ -1,5 +1,6 @@
 import { inspectionReducer } from "./inspectionReducer";
 import { explain } from "./results";
+import { select } from "./select";
 import { collFromKey, isColl, normalizePath, setPath } from "./util";
 
 export function inspector({
@@ -15,10 +16,10 @@ export function inspector({
     state = {};
 
   const baseArgs = {
-    ensure,
-    required,
+    ensure: select(selection, ensure),
+    required: select(selection, required),
     selection,
-    spec,
+    spec: select(selection, spec),
   };
 
   let promiseId;
@@ -112,7 +113,13 @@ export function inspector({
         () => state.value,
         () => newValue
       );
-      if (submit && !explain(res).invalid) submit(newValue);
+      if (submit && !explain(res).invalid) {
+        const valueToSubmit = selection
+          ? select(selection, newValue)
+          : newValue;
+
+        submit(valueToSubmit);
+      }
     },
   };
 }
