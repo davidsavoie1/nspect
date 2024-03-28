@@ -1,3 +1,4 @@
+import equal from "fast-deep-equal/es6";
 import { inspectionReducer } from "./inspectionReducer";
 import { explain } from "./results";
 import { select } from "./select";
@@ -80,6 +81,12 @@ export function inspector({
         () => state.value
       );
     },
+
+    changed(initialValue, value) {
+      return !equal(select(selection, initialValue), select(selection, value));
+    },
+
+    explain,
 
     async inspect(newValue) {
       return await inspect(
