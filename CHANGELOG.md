@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5] - 2024-03-29
+
+### Break
+
+- Do not build a UMD package anymore. Should be used in a modular project;
+
+---
+
 ## [0.0.4] - 2024-03-28
 
 ### Grow
