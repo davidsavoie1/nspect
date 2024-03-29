@@ -120,12 +120,13 @@ export function inspector({
         () => state.value,
         () => newValue
       );
-      if (submit && !explain(res).invalid) {
+
+      if (submit && explain(res).valid) {
         const valueToSubmit = selection
           ? select(selection, newValue)
           : newValue;
 
-        submit(valueToSubmit);
+        await submit(valueToSubmit, this);
       }
     },
   };
